@@ -57,7 +57,7 @@
 | 语言      | TypeScript 4                                                                                          |
 | 播放器    | [ArtPlayer](https://github.com/zhw2590582/ArtPlayer) · [HLS.js](https://github.com/video-dev/hls.js/) |
 | 代码质量  | ESLint · Prettier · Jest                                                                              |
-| 部署      | Docker · Vercel · CloudFlare pages                                                                                 |
+| 部署      | Docker · Vercel · CloudFlare pages                                                                    |
 
 ## 部署
 
@@ -99,80 +99,23 @@
 4. 设置环境变量 NEXT_PUBLIC_STORAGE_TYPE，值为 d1；设置 USERNAME 和 PASSWORD 作为站长账号
 5. 重试部署
 
-### Docker 部署
+### Upstash Redis 配置（适用于 Vercel / Cloudflare）
+
+> [Upstash](https://upstash.com/) 提供免费的 Serverless Redis 服务，非常适合与 Vercel 或 Cloudflare 搭配使用，实现云端数据持久化。
+
+1. 注册并登录 [Upstash Console](https://console.upstash.com/)
+2. 点击 **Create Database**，选择区域（建议选择离你部署平台最近的区域）
+3. 创建完成后，在数据库详情页找到 **REST URL** 和 **REST Token**，或直接复制 **UPSTASH_REDIS_REST_URL** 格式的连接字符串
+4. 在你的部署平台（Vercel / Cloudflare）中设置以下环境变量：
+   - `REDIS_URL`：填入 Upstash 提供的 Redis 连接 URL（格式如 `rediss://default:xxxxx@xxxxx.upstash.io:6379`）
+   - `NEXT_PUBLIC_STORAGE_TYPE`：设置为 `redis`
+   - `USERNAME`：站长账号
+   - `PASSWORD`：站长密码
+5. 重新部署项目
+
+> **提示**：Upstash 免费套餐提供 10,000 次/天的请求和 256MB 存储空间，足够个人使用。详情参考 [Upstash 文档](https://upstash.com/docs/introduction)。
 
 > 适用于自建服务器 / NAS / 群晖等场景。
-
-#### 1. 直接运行（最简单）
-
-```bash
-# 拉取预构建镜像
-docker pull ghcr.io/senshinya/moontv:latest
-
-# 运行容器
-# -d: 后台运行  -p: 映射端口 3000 -> 3000
-docker run -d --name moontv -p 3000:3000 ghcr.io/senshinya/moontv:latest
-```
-
-访问 `http://服务器 IP:3000` 即可。（需自行到服务器控制台放通 `3000` 端口）
-
-## Docker Compose 最佳实践
-
-若你使用 docker compose 部署，以下是一些 compose 示例
-
-### local storage 版本
-
-```yaml
-services:
-  moontv:
-    image: ghcr.io/senshinya/moontv:latest
-    container_name: moontv
-    restart: unless-stopped
-    ports:
-      - '3000:3000'
-    environment:
-      - PASSWORD=your_password
-    # 如需自定义配置，可挂载文件
-    # volumes:
-    #   - ./config.json:/app/config.json:ro
-```
-
-### Redis 版本（推荐，多账户数据隔离，跨设备同步）
-
-```yaml
-services:
-  moontv-core:
-    image: ghcr.io/senshinya/moontv:latest
-    container_name: moontv
-    restart: unless-stopped
-    ports:
-      - '3000:3000'
-    environment:
-      - USERNAME=admin
-      - PASSWORD=admin_password
-      - NEXT_PUBLIC_STORAGE_TYPE=redis
-      - REDIS_URL=redis://moontv-redis:6379
-      - NEXT_PUBLIC_ENABLE_REGISTER=true
-    networks:
-      - moontv-network
-    depends_on:
-      - moontv-redis
-    # 如需自定义配置，可挂载文件
-    # volumes:
-    #   - ./config.json:/app/config.json:ro
-  moontv-redis:
-    image: redis
-    container_name: moontv-redis
-    restart: unless-stopped
-    networks:
-      - moontv-network
-    # 如需持久化
-    # volumes:
-    #   - ./data:/data
-networks:
-  moontv-network:
-    driver: bridge
-```
 
 ## 自动同步最近更改
 
@@ -182,17 +125,17 @@ networks:
 
 ## 环境变量
 
-| 变量                        | 说明                                                        | 可选值                                                  | 默认值                                                                                                                     |
-| --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| USERNAME                    | redis 部署时的管理员账号                                    | 任意字符串                                              | （空）                                                                                                                     |
-| PASSWORD                    | 默认部署时为唯一访问密码，redis 部署时为管理员密码          | 任意字符串                                              | （空）                                                                                                                     |
-| SITE_NAME                   | 站点名称                                                    | 任意字符串                                              | MoonTV                                                                                                                     |
-| ANNOUNCEMENT                | 站点公告                                                    | 任意字符串                                              | 本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。 |
-| NEXT_PUBLIC_STORAGE_TYPE    | 播放记录/收藏的存储方式                                     | localstorage（本地浏览器存储）、redis（仅 docker 支持） | localstorage                                                                                                               |
-| REDIS_URL                   | redis 连接 url，若 NEXT_PUBLIC_STORAGE_TYPE 为 redis 则必填 | 连接 url                                                | 空                                                                                                                         |
-| NEXT_PUBLIC_ENABLE_REGISTER | 是否开放注册，仅在 redis 部署时生效                         | true / false                                            | false                                                                                                                      |
-| NEXT_PUBLIC_SEARCH_MAX_PAGE | 搜索接口可拉取的最大页数                                    | 1-50                                                    | 5                                                                                                                          |
-| NEXT_PUBLIC_IMAGE_PROXY     | 默认的浏览器端图片代理                                      | url prefix                                              | (空)                                                                                                                       |
+| 变量                        | 说明                                                | 可选值                                                     | 默认值                                                                                                                     |
+| --------------------------- | --------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| USERNAME                    | redis 部署时的管理员账号                            | 任意字符串                                                 | （空）                                                                                                                     |
+| PASSWORD                    | 默认部署时为唯一访问密码，redis 部署时为管理员密码  | 任意字符串                                                 | （空）                                                                                                                     |
+| SITE_NAME                   | 站点名称                                            | 任意字符串                                                 | MoonTV                                                                                                                     |
+| ANNOUNCEMENT                | 站点公告                                            | 任意字符串                                                 | 本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。 |
+| NEXT_PUBLIC_STORAGE_TYPE    | 播放记录/收藏的存储方式                             | localstorage（本地浏览器存储）、redis（Docker 或 Upstash） | localstorage                                                                                                               |
+| REDIS_URL                   | Redis 连接 URL，支持 Docker 自建或 Upstash 等云服务 | 连接 URL                                                   | 空                                                                                                                         |
+| NEXT_PUBLIC_ENABLE_REGISTER | 是否开放注册，仅在 redis 部署时生效                 | true / false                                               | false                                                                                                                      |
+| NEXT_PUBLIC_SEARCH_MAX_PAGE | 搜索接口可拉取的最大页数                            | 1-50                                                       | 5                                                                                                                          |
+| NEXT_PUBLIC_IMAGE_PROXY     | 默认的浏览器端图片代理                              | url prefix                                                 | (空)                                                                                                                       |
 
 ## 配置说明
 
