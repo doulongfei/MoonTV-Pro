@@ -101,7 +101,7 @@ async function initConfig() {
       if (adminConfig) {
         // 补全 SourceConfig
         const existed = new Set(
-          (adminConfig.SourceConfig || []).map((s) => s.key)
+          (adminConfig.SourceConfig || []).map((s) => s.key),
         );
         apiSiteEntries.forEach(([key, site]) => {
           if (!existed.has(key)) {
@@ -125,7 +125,7 @@ async function initConfig() {
         });
 
         const existedUsers = new Set(
-          (adminConfig.UserConfig.Users || []).map((u) => u.username)
+          (adminConfig.UserConfig.Users || []).map((u) => u.username),
         );
         userNames.forEach((uname) => {
           if (!existedUsers.has(uname)) {
@@ -139,7 +139,7 @@ async function initConfig() {
         const ownerUser = process.env.USERNAME;
         if (ownerUser) {
           adminConfig!.UserConfig.Users = adminConfig!.UserConfig.Users.filter(
-            (u) => u.username !== ownerUser
+            (u) => u.username !== ownerUser,
           );
           adminConfig!.UserConfig.Users.unshift({
             username: ownerUser,
@@ -235,10 +235,7 @@ export async function getConfig(): Promise<AdminConfig> {
   }
 
   // 检查内存缓存是否有效
-  if (
-    memoryCache.data &&
-    Date.now() - memoryCache.timestamp < CACHE_TTL
-  ) {
+  if (memoryCache.data && Date.now() - memoryCache.timestamp < CACHE_TTL) {
     return memoryCache.data;
   }
 
@@ -249,15 +246,31 @@ export async function getConfig(): Promise<AdminConfig> {
     adminConfig = await (storage as any).getAdminConfig();
   }
   if (adminConfig) {
-    // 合并一些环境变量配置
-    adminConfig.SiteConfig.SiteName = process.env.SITE_NAME || 'MoonTV';
-    adminConfig.SiteConfig.Announcement =
-      process.env.ANNOUNCEMENT ||
-      '本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。';
+    // 只在数据库中没有值时才使用环境变量作为默认值
+    if (!adminConfig.SiteConfig.SiteName) {
+      adminConfig.SiteConfig.SiteName = process.env.SITE_NAME || 'MoonTV';
+    }
+    if (!adminConfig.SiteConfig.Announcement) {
+      adminConfig.SiteConfig.Announcement =
+        process.env.ANNOUNCEMENT ||
+        '本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。';
+    }
+    if (!adminConfig.SiteConfig.SearchDownstreamMaxPage) {
+      adminConfig.SiteConfig.SearchDownstreamMaxPage =
+        Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5;
+    }
+    if (!adminConfig.SiteConfig.SiteInterfaceCacheTime) {
+      fileConfig = runtimeConfig as unknown as ConfigFileStruct;
+      adminConfig.SiteConfig.SiteInterfaceCacheTime =
+        fileConfig.cache_time || 7200;
+    }
     adminConfig.UserConfig.AllowRegister =
       process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true';
-    adminConfig.SiteConfig.ImageProxy =
-      process.env.NEXT_PUBLIC_IMAGE_PROXY || '';
+    // ImageProxy 允许为空字符串，所以用 undefined 判断
+    if (adminConfig.SiteConfig.ImageProxy === undefined) {
+      adminConfig.SiteConfig.ImageProxy =
+        process.env.NEXT_PUBLIC_IMAGE_PROXY || '';
+    }
 
     // 合并文件中的源信息
     fileConfig = runtimeConfig as unknown as ConfigFileStruct;
@@ -284,7 +297,7 @@ export async function getConfig(): Promise<AdminConfig> {
       }
     });
     cachedConfig = adminConfig;
-    
+
     // 更新内存缓存
     memoryCache = {
       data: adminConfig,
